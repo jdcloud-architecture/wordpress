@@ -1,27 +1,29 @@
 
-# 概述
-本指南描述如何把数据从自建MySQL数据库迁移到京东云数据库MySQL。整个迁移遵循如下原则：
-* 避免迁移后数据不一致
-* 缩短因迁移到京东云所导致的数据库不可更新时间（小于10分钟）
-* 降低迁移成本（包括带宽成本、存储成本、计算成本）
+从自建MySQL迁移到京东云RDS
 
-基于上述原则，本迁移采取的思路首先把数据库全量从源MySQL导出，并导入京东云数据库MySQL，该过程时间可能较长，但源数据库依然处于完全可读写状态；在完成全量导入后，分析源数据新增的binlog文件，然后增量导入到京东云数据库MySQL。增量导入过程的时间取决于在启动全量导出时间点到启动增量导入的时间点。
+# 1 概述
+本文描述如何把数据从自建MySQL数据库迁移到京东云数据库RDS-MySQL(简称京东云RDS)。整个迁移将遵循如下原则：
+* 避免迁移后数据不一致;
+* 缩短因迁移到京东云所导致的数据库不可修改时间(小于10分钟);
+* 降低迁移成本(包括带宽成本、存储成本、计算成本);
 
-整个MySQL上云迁移过程会使用京东如下云服务：
-* 云数据库MySQL：提供MySQL数据库PaaS服务，同时自带跨可用区高可用、自动备份和性能监控功能；
-* 云主机：作为MySQL客户端，完成MySQL数据的导入；
-* 对象存储：提供数据备份文件存储功能。自建MySQL的备份文件可通过Internet上传到对象存储，然后通过京东云内部的高速网络下载到云主机。
+基于上述原则，本迁移采取的思路首先把数据库全量从源MySQL导出，然后导入京东云RDS，该过程时间可能较长，但源数据库依然处于完全可读写状态；在完成全量导入后，分析源数据新增的binlog文件，增量导入到京东云RDS。增量导入过程所消耗的时长取决于在启动全量导出时间点到启动增量导入时间点之间数据库所发生的变化量。
 
-整个迁移过程包含如下阶段，并以迁移一个名为“sbtest“的database详细介绍整个过程。
-* 准备环境
+从自建MySQL迁移到京东云RDS的整个过程会使用京东如下云服务：
+* 云数据库RDS-MySQL：提供MySQL数据库PaaS服务，自带跨可用区高可用、自动备份和性能监控功能；
+* 云主机：作为MySQL客户端，获得全量和增量数据文件，完成MySQL数据的导入；
+* 对象存储：提供数据备份文件存储功能。自建MySQL的数据备份文件可通过Internet上传到对象存储，然后通过京东云内部的高速网络下载到云主机。
+
+整个迁移过程包含如下阶段：
+* 准备迁移环境
 * 迁移全量数据
 * 迁移增量数据
 * 启用新数据库
 
-# 准备环境
-本阶段主要验证迁移过程的环境需求和所需资源。
+# 2 准备迁移环境
+本阶段主要准备迁移过程所需的环境和资源。
 
-## 检查是否启用源数据库binlog
+## 2.1 检查是否启用源数据库binlog
 首先检查源MySQL的版本信息。在本文中，源MySQL版本是“5.7.24-log MySQL Community Server”
 ```
 [root@ymq-srv011 ~]# mysql -usbtest -p
@@ -40,7 +42,7 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 ```
 
 要实现增量导入，需确保源数据库开启了binlog。访问源数据库，执行如下命令,确保log_bin变量的值是“ON"。
-```sql
+```
 mysql> show variables like 'log_%';
 +----------------------------------------+--------------------------------+
 | Variable_name                          | Value                          |
@@ -50,12 +52,12 @@ mysql> show variables like 'log_%';
 | log_bin_index                          | /var/lib/mysql/mysql-bin.index |
 ```
 如果发现log_bin的值是OFF，则需在MySQL Server配置文件/etc/my.cnf中增加如下内容，然后重新启动MySQL数据库服务。
- ```ini
+ ```
 server-id=1
 log-bin=mysql-bin
 ```
-## 检查源数据库大小
-为了准确规划目标MySQL数据库配置有个准确规划，并对迁移时间有个初步估算，建议查看源数据库大小，可执行如下命令。
+## 2.2 检查源数据库大小
+为了准确规划目标MySQL数据库配置，并对迁移时间有个初步估算，建议查看源数据库大小，可执行如下命令。
 ```
 mysql> select concat(round(sum(DATA_LENGTH/1024/1024),2),'MB') as data from information_schema.TABLES where table_schema='sbtest';
 +-----------+
@@ -65,12 +67,10 @@ mysql> select concat(round(sum(DATA_LENGTH/1024/1024),2),'MB') as data from info
 +-----------+
 1 row in set (0.07 sec)
 ```
-通过上述命令能获得所需迁移的数据为8384.63MB。
+通过上述命令得知所需迁移的数据大小为8384.63MB。
 
-## 在京东云上创建RDS实例、账户和数据库
-登录京东云控制，创建MySQL实例，配置的规格（CPU、内存和存储空间）可根据源数据库的规格确定，同时创建账户（比如user001）和目标数据库(比如sbtest)。京东云除了提供图形化的控制台操作外，还支持命令行。比如可通过如下命令获得京东云云数据库的相关信息（参考1)
-
-通过下述命令查看RDS实例配置信息。
+## 2.3 在京东云上创建RDS实例、账户和数据库
+登录京东云控制，创建MySQL实例，配置的规格(CPU、内存和存储空间)可根据源数据库的规格确定，同时创建账户(比如user001)和目标数据库(比如sbtest)。京东云除了提供图形化的控制台操作外，还支持命令行。比如可通过如下命令获得京东云RDS的相关信息。
 ```
 MichaeldeMacBook-Pro-2:~ myang$ jdc rds  describe-instance-attributes --instance-id mysql-fqiawnyind
 {
@@ -135,11 +135,13 @@ MichaeldeMacBook-Pro-2:~ myang$ jdc rds  describe-databases  --instance-id mysql
     "request_id": "bfds91238ju3m48j1t7kg9ok6vp7p9pw"
 }
 ```
-## 准备对象存储环境
-对象存储的试用价格便宜[（京东云参考价格：.00427元/GB/天）](https://docs.jdcloud.com/cn/object-storage-service/price-overview)，而且把数据上传到对象存储是免收流量费，通过内网从对象存储下载到云主机也免收流量费。
-以100G数据存储一天，只需价格为0.427元，而且无需在京东云上产生额外的带宽成本。
+## 2.3 准备对象存储环境
+对象存储的价格便宜[(京东云参考价格：.00427元/GB/天)](https://docs.jdcloud.com/cn/object-storage-service/price-overview)，而且把数据上传到对象存储是免收流量费，通过内网从对象存储下载到云主机也免收流量费，因此，当数据库全量数据较大时，采用对象存储完成现有MySQL环境到京东云的数据中转。
+
 
-操作京东云对象存储可采用京东云控制台，但对传输大数据文件（>1GB)，建议采用京东云提供的s3cmd(参考：[使用S3cmd管理京东云OSS](https://docs.jdcloud.com/cn/object-storage-service/s3cmd))。同时在本地上传带宽不限制的情况下，京东云对象存储的上传带宽能达到10MB/秒。
+假设100G数据，在京东云对象存储上存储1天，只需花费0.427元，而且无需在京东云上产生额外的带宽成本。
+
+操作京东云对象存储可采用京东云控制台，但对传输大数据文件(>1GB)，建议采用京东云提供的s3cmd(参考：[使用S3cmd管理京东云OSS](https://docs.jdcloud.com/cn/object-storage-service/s3cmd))。在本地上传带宽不限制的情况下，京东云对象存储的上传带宽能达到10MB/秒。下一命令展示如何上传文件到京东云对象存储，以及传输网络速度。
 ```
 [root@ymq-srv001 ~]# time ./s3cmd/s3cmd put share.tar.1 s3://solution
 WARNING: Module python-magic is not available. Guessing MIME types based on file extensions.
@@ -150,14 +152,14 @@ upload: 'share.tar.1' -> 's3://solution/share.tar.1'  [part 2 of 20, 15MB] [1 of
 upload: 'share.tar.1' -> 's3://solution/share.tar.1'  [part 3 of 20, 15MB] [1 of 1]
  15728640 of 15728640   100% in    1s    11.45 MB/s  done
 ```
-说明：在京东云上，如果云主机和对象存储是跨region访问，需要在云主机host上配置机器名和IP的映射。比如，下面是在上海地域的云主机访问北京地域的对象存储时的hosts文件配置，其中solution是bucket名字。
+说明：在京东云上，如果云主机和对象存储是跨region访问，需要在云主机host上配置对象存储服务的endpoint对应的机器名和公网IP映射。比如，下面是在上海地域的云主机访问北京地域的对象存储时的hosts文件配置，其中solution是bucket名字。
 ```ini
 101.124.27.193  s3.cn-north-1.jcloudcs.com
-101.124.27.129  solution.s3.cn-north-1.jcloudcs.com
+101.124.27.129  solutions.s3.cn-north-1.jcloudcs.com
 ```
-## 准备京东云RDS操作客户端
-在京东云上创建一台云主机，该云主机和前面创建的云数据库RDS-MySQL实例位于同一个VPC。此外，安装MySQL客户端。执行如下命令，验证京东云数据库实例能正常访问。
-```bash
+## 2.3 准备京东云RDS操作客户端
+在京东云上创建一台云主机，该云主机和前面创建的京东云RD实例位于同一个VPC。此外，安装MySQL客户端。执行如下命令，验证京东云RDS实例能正常访问。
+```
 [root@ymq-srv011 ~]# mysql -uuser001 -p  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com  -Dsbtest
 Enter password: 
 Reading table information for completion of table and column names
@@ -406,5 +408,4 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 * 京东云云数据库RDS: [https://docs.jdcloud.com/cn/rds/product-overview](https://docs.jdcloud.com/cn/rds/product-overview)
 * 京东云对象存储：[https://docs.jdcloud.com/cn/object-storage-service/product-overview](https://docs.jdcloud.com/cn/object-storage-service/product-overview)
 * 京东云对象存储S3CMD: [https://docs.jdcloud.com/cn/object-storage-service/s3cmd](https://docs.jdcloud.com/cn/object-storage-service/s3cmd)
-  
-
+* 京东云命令行：[https://docs.jdcloud.com/cn/cli/introduction](https://docs.jdcloud.com/cn/cli/introduction)
