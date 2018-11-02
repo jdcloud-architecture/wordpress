@@ -348,7 +348,7 @@ NDc0Njk2MjUzCW5ldyB2YWx1ZeXHN5M=
 COMMIT/*!*/;
 
 ```
-在上述内容本质是对数据库进行了一次update操作，其中352是起点，694是结束点。基于上述信息，形成增量SQL文件。
+在上述内容本质是对数据库进行了一次update操作，其中1366是起点，1764是结束点。基于上述信息，形成增量SQL文件。
 
 ```
 root@ymq-srv011 target]# mysqlbinlog --skip-gtids --start-position=1366 --stop-position=1764  /var/lib/mysql/mysql-bin.000005 > `date +%F-%T`-add.sql
