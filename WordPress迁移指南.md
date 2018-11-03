@@ -111,7 +111,7 @@ MySQL的binlog日志
 
 ```bash
 
-MichaeldeMacBook-Pro-2:~ myang$ mysqldump -u user001 -p -h mysql-cn-north-1-076a9fd5a44a4eff.public.jcloud.com --databases wordpress -lF
+MichaeldeMacBook-Pro-2:~ $ mysqldump -u user001 -p -h mysql-cn-north-1-076a9fd5a44a4eff.public.jcloud.com --databases wordpress -lF
 Enter password: 
 -- MySQL dump 10.13  Distrib 5.7.23, for macos10.13 (x86_64)
 --
@@ -175,7 +175,7 @@ https://www.cnblogs.com/frankielf0921/p/5924365.html
 差异备份：fidderential backup
 
 
-MichaeldeMacBook-Pro-2:~ myang$ mysqldump -u user001 -p -h mysql-cn-north-1-076a9fd5a44a4eff.public.jcloud.com --databases wordpress --single-transaction --flush-logs 
+MichaeldeMacBook-Pro-2:~ $ mysqldump -u user001 -p -h mysql-cn-north-1-076a9fd5a44a4eff.public.jcloud.com --databases wordpress --single-transaction --flush-logs 
 Enter password: 
 -- MySQL dump 10.13  Distrib 5.7.23, for macos10.13 (x86_64)
 --
@@ -382,3 +382,10 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 real	14m43.311s
 user	0m54.393s
 sys	0m20.569s
+
+
+
+
+              (No default value)
+[root@ymq-srv011 ~]# mysqlbinlog --skip-gtids --start-position=123 --stop-position=1120  /var/lib/mysql/mysql-bin.000003 > `date +%F-%T`-add.sql
+[root@ymq-srv011 ~]# 

@@ -72,7 +72,7 @@ mysql> select concat(round(sum(DATA_LENGTH/1024/1024),2),'MB') as data from info
 ## 2.3 在京东云上创建RDS实例、账户和数据库
 登录京东云控制，创建MySQL实例，配置的规格(CPU、内存和存储空间)可根据源数据库的规格确定，同时创建账户(比如user001)和目标数据库(比如sbtest)。京东云除了提供图形化的控制台操作外，还支持命令行。比如可通过如下命令获得京东云RDS的相关信息。
 ```
-MichaeldeMacBook-Pro-2:~ myang$ jdc rds  describe-instance-attributes --instance-id mysql-fqiawnyind
+MacBook:~ user$ jdc rds  describe-instance-attributes --instance-id mysql-fqiawnyind
 {
     "error": null, 
     "result": {
@@ -114,7 +114,7 @@ MichaeldeMacBook-Pro-2:~ myang$ jdc rds  describe-instance-attributes --instance
 ```
 通过如下命令获得该实例的数据库信息。
 ```
-MichaeldeMacBook-Pro-2:~ myang$ jdc rds  describe-databases  --instance-id mysql-fqiawnyind
+MacBook:~ user$ jdc rds  describe-databases  --instance-id mysql-fqiawnyind
 {
     "error": null, 
     "result": {
@@ -177,8 +177,8 @@ owners.
 
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 ```
-# 迁移全量数据
-## 导出全量数据
+# 2 迁移全量数据
+## 2.1 导出全量数据
 为了保证导出全量数据的过程中源数据库依然可以读写，需要在启动dump时，重新生成新的binlog文件。下面首先查看当前的binlog。
 ```
 mysql> show master logs;
@@ -187,9 +187,10 @@ mysql> show master logs;
 +------------------+-----------+
 | mysql-bin.000001 |       928 |
 | mysql-bin.000002 |      1406 |
-| mysql-bin.000003 |      1503 |
+| mysql-bin.000003 |      1690 |
+| mysql-bin.000004 |       341 |
 +------------------+-----------+
-3 rows in set (0.00 sec)
+4 rows in set (0.00 sec)
 ```
 然后执行如下命令dump数据库全量。
 ```
@@ -220,8 +221,8 @@ mysql> show master logs;
 [root@ymq-srv011 ~]# ls -al *.gz
 -rw-r--r-- 1 root root 3851542486 Nov  2 15:30 sbtest.sql.gz
 ```
-## 传输全量数据
-
+## 2.2 传输全量数据
+执行s3cmd命令，把全量数据上传到京东云对象存储。从下面命令可看出，通过公网上传数据到京东云对象存储的网速约10MB/秒。
 
 ```
 [root@ymq-srv011 ~]# ls -al *.gz
@@ -229,13 +230,12 @@ mysql> show master logs;
 [root@ymq-srv011 ~]# time s3cmd/s3cmd put sbtest.sql.gz   s3://solution
 upload: 'sbtest.sql.gz' -> 's3://solution/sbtest.sql.gz'  [part 245 of 245, 13MB] [1 of 1]
  13754326 of 13754326   100% in    0s    14.65 MB/s  done
-
+...
 real	5m21.783s
 user	0m24.538s
 sys	0m5.214s
 ```
-
-显示上传后的文件，并验证MD5是否相同。
+通过s3cmd命令显示上传后的文件信息。
 ```
 root@ymq-srv011 ~]# s3cmd/s3cmd info s3://solution/sbtest.sql.gz
 s3://solution/sbtest.sql.gz (object):
@@ -249,8 +249,8 @@ s3://solution/sbtest.sql.gz (object):
    CORS:      none
    ACL:       none
 ```
-## 导入全量数据
-在京东云服务器，执行通过s3cmd命令完成全量数据文件下载，并解压文件。由于云主机和对象存储之间是高速内网，所以下载速度很快。
+## 2.3 导入全量数据
+在京东云服务器，执行s3cmd命令完成全量数据文件下载，并解压文件。由于云主机和对象存储之间是高速内网，所以下载速度很快。
 ```
 root@ymq-srv011 target]# ~/s3cmd/s3cmd get s3://solution/sbtest.sql.gz 
 download: 's3://solution/sbtest.sql.gz' -> './sbtest.sql.gz'  [1 of 1]
@@ -260,7 +260,7 @@ download: 's3://solution/sbtest.sql.gz' -> './sbtest.sql.gz'  [1 of 1]
 [root@ymq-srv011 target]# ls -al *.sql
 -rw-r--r-- 1 root root 8043029672 Nov  2 08:19 sbtest.sql
 ```
-执行全量数据导入，利用time命令统计数据导入所消耗的时长。为了缩短导入实践在执行mysqldump命令时，可增加--net-buffer-length=5000000选项，把单条insert语句的最大值从1M修改为5M，从而减少insert命令的个数。
+执行全量数据导入，利用time命令统计数据导入所消耗的时长。为了缩短导入时长，可在执行mysqldump命令导出全量数据时，可增加--net-buffer-length=5000000选项，把单条insert语句的最大值从1M修改为5M，从而减少insert命令的个数。
 ```
 root@ymq-srv011 target]#  time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -Dsbtest<sbtest.sql
 mysql: [Warning] Using a password on the command line interface can be insecure.
@@ -268,15 +268,15 @@ real	14m52.248s
 user	0m55.703s
 sys	0m23.169s
 ```
-# 迁移增量数据
+# 3 迁移增量数据
 迁移增量数据是指导入在开始导出全量数据时间点后形成的新的binlog文件，该操作需要数据库账号具有超级权限。在正常情况下，京东云RDS账户不具有超级权限。
-## 提交工单，申请超级用户权限
-正常情况下，用户不具备超级权限。
+## 3.1 提交工单，申请超级用户权限
+正常情况下，用户不具备超级权限，执行show master logs命令将报错。
 ```
 mysql> show master logs;
 ERROR 1227 (42000): Access denied; you need (at least one of) the SUPER, REPLICATION CLIENT privilege(s) for this operation
 ```
-测试通过控制台提交工单，告诉后台RDS实例ID和账号。在后台完成设置后，将能执行show master logs命令。
+用户通过控制台提交工单，并在工单中提供RDS实例ID和账号。京东云后台运维人员完成设置后，将能成功执行show master logs命令。
 ```
 mysql> show master logs;
 +------------------+-----------+
@@ -286,8 +286,8 @@ mysql> show master logs;
 | mysql-bin.000035 |       241 |
 | mysql-bin.000036 |       384 |
 ```
-## 设置源数据库只读
-为了避免在导入增量的过程中产生新的数据，可把数据库设置为只读，这样包括具有超级权限的账户也不能修改数据库。
+## 3.2 设置源数据库只读
+为了避免在导入增量数据的过程中产生新数据，可把源数据库设置为只读，这样包括具有超级权限的账户也不能修改数据库。
 ```
 mysql> show global variables like "%read_only%";
 +-----------------------+-------+
@@ -322,8 +322,13 @@ Query OK, 0 rows affected (0.00 sec)
 mysql> update sbtest1 set pad="001" where id = 1;
 ERROR 1223 (HY000): Can't execute the query because you have a conflicting read lock
 ```
-## 导入binlog增量
-首先分析binlog文件，通常能看到如下信息：
+## 3.3 导入binlog增量
+从源数据库的/var/lib/mysql目录获得新增的binlog文件（本文新增的binlog文件是mysql-bin.000005)
+通过执行如下命令:
+```
+mysqlbinlog /var/lib/mysql/mysql-bin.000005
+```
+将能看到如下信息：
 ```
 # at 1298
 #181102 17:48:45 server id 1  end_log_pos 1366 CRC32 0xf0bca784         Query   thread_id=118   exec_time=0     error_code=0
@@ -350,10 +355,13 @@ NDc0Njk2MjUzCW5ldyB2YWx1ZeXHN5M=
 COMMIT/*!*/;
 
 ```
-在上述内容本质是对数据库进行了一次update操作，其中1366是起点，1764是结束点。基于上述信息，形成增量SQL文件。
+在上述内容本质是对数据库进行了一次update操作，其中1366是起始点，1764是结束点。基于上述信息，执行如下命令形成增量SQL文件。
 
 ```
 root@ymq-srv011 target]# mysqlbinlog --skip-gtids --start-position=1366 --stop-position=1764  /var/lib/mysql/mysql-bin.000005 > `date +%F-%T`-add.sql
+```
+形成的增量SQL文件内容如下：
+```
 [root@ymq-srv011 target]# cat 2018-11-02-17\:51\:24-add.sql
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
 /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
@@ -390,7 +398,7 @@ DELIMITER ;
 /*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;
 ```
-执行SQL，可检测到增量修改已在目标数据库生效。
+执行数据库增量SQL文件，然后查询数据库确认所进行的增量修改已同步在京东云RDS目标库中。
 ```
 [root@ymq-srv011 target]#  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -e "select * from sbtest.sbtest1 where id = 1"
 mysql: [Warning] Using a password on the command line interface can be insecure.
@@ -401,10 +409,11 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 +----+--------+-------------------------------------------------------------------------------------------------------------------------+-----------+
 ```
 在完成增量更新后，可及时通过工单系统联系京东云运维，及时释放账户的超级权限。
-# 启用新数据库
+# 4 启用新数据库
 通常再完成迁移后，尽快去验证源数据库和RDS数据库是否一致，并根据性能需求升级RDS配置。
-
-# 参考文献
+# 5 小结
+本文介绍了自建MySQL数据迁移到京东云RDS的全过程，同时通过先导入全量，然后再导入增量的方法，大大缩短迁移过程中数据库不可更改的时长。当然在源数据库数据量不大，同时允许数据库不可更改时间较长时，在进行全量导出时就对源数据进行锁定，这样一次全量导入就能把源数据库中的数据完全迁移到京东云RDS。
+# 6 参考文献
 * 京东云云数据库RDS: [https://docs.jdcloud.com/cn/rds/product-overview](https://docs.jdcloud.com/cn/rds/product-overview)
 * 京东云对象存储：[https://docs.jdcloud.com/cn/object-storage-service/product-overview](https://docs.jdcloud.com/cn/object-storage-service/product-overview)
 * 京东云对象存储S3CMD: [https://docs.jdcloud.com/cn/object-storage-service/s3cmd](https://docs.jdcloud.com/cn/object-storage-service/s3cmd)
