@@ -26,7 +26,7 @@
 ## 2.1 检查是否启用源数据库binlog
 首先检查源MySQL的版本信息。在本文中，源MySQL版本是“5.7.24-log MySQL Community Server”
 ```
-[root@ymq-srv011 ~]# mysql -usbtest -p
+[root@srv011 ~]# mysql -usbtest -p
 Enter password: 
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 82
@@ -143,7 +143,7 @@ MacBook:~ user$ jdc rds  describe-databases  --instance-id mysql-fqiawnyind
 
 操作京东云对象存储可采用京东云控制台，但对传输大数据文件(>1GB)，建议采用京东云提供的s3cmd(参考：[使用S3cmd管理京东云OSS](https://docs.jdcloud.com/cn/object-storage-service/s3cmd))。在本地上传带宽不限制的情况下，京东云对象存储的上传带宽能达到10MB/秒。下一命令展示如何上传文件到京东云对象存储，以及传输网络速度。
 ```
-[root@ymq-srv001 ~]# time ./s3cmd/s3cmd put share.tar.1 s3://solution
+[root@srv001 ~]# time ./s3cmd/s3cmd put share.tar.1 s3://solution
 WARNING: Module python-magic is not available. Guessing MIME types based on file extensions.
 upload: 'share.tar.1' -> 's3://solution/share.tar.1'  [part 1 of 20, 15MB] [1 of 1]
  15728640 of 15728640   100% in    1s    10.93 MB/s  done
@@ -160,7 +160,7 @@ upload: 'share.tar.1' -> 's3://solution/share.tar.1'  [part 3 of 20, 15MB] [1 of
 ## 2.3 准备京东云RDS操作客户端
 在京东云上创建一台云主机，该云主机和前面创建的京东云RD实例位于同一个VPC。此外，安装MySQL客户端。执行如下命令，验证京东云RDS实例能正常访问。
 ```
-[root@ymq-srv011 ~]# mysql -uuser001 -p  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com  -Dsbtest
+[root@srv011 ~]# mysql -uuser001 -p  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com  -Dsbtest
 Enter password: 
 Reading table information for completion of table and column names
 You can turn off this feature to get a quicker startup with -A
@@ -212,22 +212,22 @@ mysql> show master logs;
 ```
 在执行dump过程中，对数据库执行的任何修改操作，将被记录在mysql-bin.000005文件中。在dump完成后，将形成SQL文件。
 ```
-[root@ymq-srv011 ~]# ls -al sbtest.sql
+[root@srv011 ~]# ls -al sbtest.sql
 -rw-r--r--   1 root root 8043029672 Nov  2 15:30 sbtest.sql
 ```
 为了减少文件传输，可执行gzip命令先压缩。
 ```
-[root@ymq-srv011 ~]# gzip sbtest.sql
-[root@ymq-srv011 ~]# ls -al *.gz
+[root@srv011 ~]# gzip sbtest.sql
+[root@srv011 ~]# ls -al *.gz
 -rw-r--r-- 1 root root 3851542486 Nov  2 15:30 sbtest.sql.gz
 ```
 ## 2.2 传输全量数据
 执行s3cmd命令，把全量数据上传到京东云对象存储。从下面命令可看出，通过公网上传数据到京东云对象存储的网速约10MB/秒。
 
 ```
-[root@ymq-srv011 ~]# ls -al *.gz
+[root@srv011 ~]# ls -al *.gz
 -rw-r--r-- 1 root root 3851542486 Nov  2 15:30 sbtest.sql.gz
-[root@ymq-srv011 ~]# time s3cmd/s3cmd put sbtest.sql.gz   s3://solution
+[root@srv011 ~]# time s3cmd/s3cmd put sbtest.sql.gz   s3://solution
 upload: 'sbtest.sql.gz' -> 's3://solution/sbtest.sql.gz'  [part 245 of 245, 13MB] [1 of 1]
  13754326 of 13754326   100% in    0s    14.65 MB/s  done
 ...
@@ -237,7 +237,7 @@ sys	0m5.214s
 ```
 通过s3cmd命令显示上传后的文件信息。
 ```
-root@ymq-srv011 ~]# s3cmd/s3cmd info s3://solution/sbtest.sql.gz
+root@srv011 ~]# s3cmd/s3cmd info s3://solution/sbtest.sql.gz
 s3://solution/sbtest.sql.gz (object):
    File size: 3851542486
    Last mod:  Fri, 02 Nov 2018 08:19:02 GMT
@@ -252,17 +252,17 @@ s3://solution/sbtest.sql.gz (object):
 ## 2.3 导入全量数据
 在京东云服务器，执行s3cmd命令完成全量数据文件下载，并解压文件。由于云主机和对象存储之间是高速内网，所以下载速度很快。
 ```
-root@ymq-srv011 target]# ~/s3cmd/s3cmd get s3://solution/sbtest.sql.gz 
+root@srv011 target]# ~/s3cmd/s3cmd get s3://solution/sbtest.sql.gz 
 download: 's3://solution/sbtest.sql.gz' -> './sbtest.sql.gz'  [1 of 1]
  3851542486 of 3851542486   100% in   32s   114.37 MB/s  done
 
-[root@ymq-srv011 target]# gzip -d sbtest.sql.gz
-[root@ymq-srv011 target]# ls -al *.sql
+[root@srv011 target]# gzip -d sbtest.sql.gz
+[root@srv011 target]# ls -al *.sql
 -rw-r--r-- 1 root root 8043029672 Nov  2 08:19 sbtest.sql
 ```
 执行全量数据导入，利用time命令统计数据导入所消耗的时长。为了缩短导入时长，可在执行mysqldump命令导出全量数据时，可增加--net-buffer-length=5000000选项，把单条insert语句的最大值从1M修改为5M，从而减少insert命令的个数。
 ```
-root@ymq-srv011 target]#  time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -Dsbtest<sbtest.sql
+root@srv011 target]#  time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -Dsbtest<sbtest.sql
 mysql: [Warning] Using a password on the command line interface can be insecure.
 real	14m52.248s
 user	0m55.703s
@@ -358,11 +358,11 @@ COMMIT/*!*/;
 在上述内容本质是对数据库进行了一次update操作，其中1366是起始点，1764是结束点。基于上述信息，执行如下命令形成增量SQL文件。
 
 ```
-root@ymq-srv011 target]# mysqlbinlog --skip-gtids --start-position=1366 --stop-position=1764  /var/lib/mysql/mysql-bin.000005 > `date +%F-%T`-add.sql
+root@srv011 target]# mysqlbinlog --skip-gtids --start-position=1366 --stop-position=1764  /var/lib/mysql/mysql-bin.000005 > `date +%F-%T`-add.sql
 ```
 形成的增量SQL文件内容如下：
 ```
-[root@ymq-srv011 target]# cat 2018-11-02-17\:51\:24-add.sql
+[root@srv011 target]# cat 2018-11-02-17\:51\:24-add.sql
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
 /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
 DELIMITER /*!*/;
@@ -400,7 +400,7 @@ DELIMITER ;
 ```
 执行数据库增量SQL文件，然后查询数据库确认所进行的增量修改已同步在京东云RDS目标库中。
 ```
-[root@ymq-srv011 target]#  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -e "select * from sbtest.sbtest1 where id = 1"
+[root@srv011 target]#  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -e "select * from sbtest.sbtest1 where id = 1"
 mysql: [Warning] Using a password on the command line interface can be insecure.
 +----+--------+-------------------------------------------------------------------------------------------------------------------------+-----------+
 | id | k      | c                                                                                                                       | pad       |

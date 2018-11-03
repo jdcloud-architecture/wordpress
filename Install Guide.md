@@ -10,17 +10,17 @@
 ## 安装Nginx
 首先更新云主机yum源
 ```bash
-[root@ymq-srv011 ~]#  yum upgrade
+[root@srv011 ~]#  yum upgrade
 ```
 安装Nginx，将自动创建名为nginx的账号和账号组，并创建nginxNginx服务，该服务以nginx账号身份运行。
 ```bash
-[root@ymq-srv011 ~]# yum install nginx -y
-[root@ymq-srv011 ~]# id nginx
+[root@srv011 ~]# yum install nginx -y
+[root@srv011 ~]# id nginx
 uid=996(nginx) gid=994(nginx) groups=994(nginx)
-[root@ymq-srv011 ~]# chkconfig nginx on
-[root@ymq-srv011 ~]# service nginx start
+[root@srv011 ~]# chkconfig nginx on
+[root@srv011 ~]# service nginx start
 Redirecting to /bin/systemctl start nginx.service
-[root@ymq-srv011 ~]# service nginx status
+[root@srv011 ~]# service nginx status
 Redirecting to /bin/systemctl status nginx.service
 ● nginx.service - The nginx HTTP and reverse proxy server
    Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; vendor preset: disabled)
@@ -34,14 +34,14 @@ Redirecting to /bin/systemctl status nginx.service
            ├─1415 nginx: worker process
            └─1416 nginx: worker process
 
-Oct 30 15:10:22 ymq-srv011 systemd[1]: Starting The nginx HTTP and reverse proxy server...
-Oct 30 15:10:22 ymq-srv011 nginx[1409]: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-Oct 30 15:10:22 ymq-srv011 nginx[1409]: nginx: configuration file /etc/nginx/nginx.conf test is successful
-Oct 30 15:10:22 ymq-srv011 systemd[1]: Started The nginx HTTP and reverse proxy server.
+Oct 30 15:10:22 srv011 systemd[1]: Starting The nginx HTTP and reverse proxy server...
+Oct 30 15:10:22 srv011 nginx[1409]: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+Oct 30 15:10:22 srv011 nginx[1409]: nginx: configuration file /etc/nginx/nginx.conf test is successful
+Oct 30 15:10:22 srv011 systemd[1]: Started The nginx HTTP and reverse proxy server.
 ```
 通过执行curl命令验证Nginx运行是否正常，并访问缺省的页面。
 ```bash
-[root@ymq-srv011 ~]# curl http://localhost -I
+[root@srv011 ~]# curl http://localhost -I
 HTTP/1.1 200 OK
 Server: nginx/1.12.2
 Date: Tue, 30 Oct 2018 07:15:19 GMT
@@ -51,7 +51,7 @@ Last-Modified: Tue, 06 Mar 2018 09:26:21 GMT
 Connection: keep-alive
 ETag: "5a9e5ebd-e74"
 Accept-Ranges: bytes
-[root@ymq-srv011 ~]# curl http://localhost
+[root@srv011 ~]# curl http://localhost
 ```
 获得如下HTML页面信息，可发现缺省的配置文件是/etc/nginx/nginx.conf，文档根目录是/usr/share/nginx/html
 ```html
@@ -74,14 +74,14 @@ WordPress是基于PHP的架构，因此需要配置php-fp作为FastCGI后台程�
 * php: A module for PHP applications that use MySQL databases
 * php-cli: Command-line interface for PHP
 ```bash
-[root@ymq-srv011 html]# yum -y install php-fpm php-mysql php-cli
+[root@srv011 html]# yum -y install php-fpm php-mysql php-cli
 Loaded plugins: fastestmirror, langpacks
 Repository base is listed more than once in the configuration
 
-[root@ymq-srv011 html]# chkconfig php-fpm on
+[root@srv011 html]# chkconfig php-fpm on
 Note: Forwarding request to 'systemctl enable php-fpm.service'.
 Created symlink from /etc/systemd/system/multi-user.target.wants/php-fpm.service to /usr/lib/systemd/system/php-fpm.service.
-[root@ymq-srv011 html]# 
+[root@srv011 html]# 
 ```
 编辑PHP-FPM配置文件/etc/php-fpm.d/www.conf, 让PHP FastCGI Process Manager以nginx账户身份去访问文件。原文件内容为：
 ```ini
@@ -103,7 +103,7 @@ group = nginx
 ```
 此时，执行如下命令，发现nginx并没有把php文件发送给后台的php-fpm模块，原因是我们还没有完成nginx.conf的配置，把PHP文件请求发送给PHP FPM。
 ```bash
-[root@ymq-srv011 html]# curl http://localhost/phpinfo.php
+[root@srv011 html]# curl http://localhost/phpinfo.php
 <?php phpinfo();?>
 ```
 
@@ -121,7 +121,7 @@ group = nginx
 ```
 在重新启动nginx服务后，将看到如下信息（特别是X-Powered-By: PHP/5.4.16），表示nginx和php的集成配置成功。
 ```bash
-[root@ymq-srv011 nginx]# curl http://localhost/phpinfo.php -I
+[root@srv011 nginx]# curl http://localhost/phpinfo.php -I
 HTTP/1.1 200 OK
 Server: nginx/1.12.2
 Date: Tue, 30 Oct 2018 07:47:36 GMT
@@ -144,7 +144,7 @@ WordPress所采用的MySQL数据库采用京东云提供的RDS-MySQL服务，当
 CentOS 7的默认YUM源中是MariaDB，而不是我们常用的MySQL。 
 ## 验证通过客户端访问数据库
 ```bash
-[root@ymq-srv011 ~]# wget http://repo.mysql.com/mysql57-community-release-el7.rpm
+[root@srv011 ~]# wget http://repo.mysql.com/mysql57-community-release-el7.rpm
 --2018-10-31 14:13:56--  http://repo.mysql.com/mysql57-community-release-el7.rpm
 Resolving repo.mysql.com (repo.mysql.com)... 104.118.86.179
 Connecting to repo.mysql.com (repo.mysql.com)|104.118.86.179|:80... connected.
@@ -156,15 +156,15 @@ Saving to: ‘mysql57-community-release-el7.rpm’
 
 2018-10-31 14:13:56 (137 KB/s) - ‘mysql57-community-release-el7.rpm’ saved [25680/25680]
 
-[root@ymq-srv011 ~]# rpm -ivh mysql57-community-release-el7.rpm
+[root@srv011 ~]# rpm -ivh mysql57-community-release-el7.rpm
 warning: mysql57-community-release-el7.rpm: Header V3 DSA/SHA1 Signature, key ID 5072e1f5: NOKEY
 Preparing...                          ################################# [100%]
 Updating / installing...
    1:mysql57-community-release-el7-11 ################################# [100%]
 
-[root@ymq-srv011 ~]# yum install -y mysql-server
+[root@srv011 ~]# yum install -y mysql-server
 
-[root@ymq-srv011 ~]#  mysql -u user001 -p -h jddb-cn-north-1-fd9a1be6a9e34f0c.jcloud.com
+[root@srv011 ~]#  mysql -u user001 -p -h jddb-cn-north-1-fd9a1be6a9e34f0c.jcloud.com
 Enter password: 
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 1419
@@ -186,7 +186,7 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 访问[https://cn.wordpress.org/download/]网站，可获得最新的中文版本。下面现在最新的WordPress中文版，并解压缩到/opt目录下。
 
 ```bash
-[root@ymq-srv011 ~]# wget https://cn.wordpress.org/wordpress-4.9.4-zh_CN.tar.gz
+[root@srv011 ~]# wget https://cn.wordpress.org/wordpress-4.9.4-zh_CN.tar.gz
 --2018-10-31 10:25:34--  https://cn.wordpress.org/wordpress-4.9.4-zh_CN.tar.gz
 Resolving cn.wordpress.org (cn.wordpress.org)... 198.143.164.252
 Connecting to cn.wordpress.org (cn.wordpress.org)|198.143.164.252|:443... connected.
@@ -198,20 +198,20 @@ Saving to: ‘wordpress-4.9.4-zh_CN.tar.gz’
 
 2018-10-31 10:25:38 (3.48 MB/s) - ‘wordpress-4.9.4-zh_CN.tar.gz’ saved [9082696/9082696]
 
-[root@ymq-srv011 opt]# tar zxvf /root/wordpress-4.9.8.tar.gz 
+[root@srv011 opt]# tar zxvf /root/wordpress-4.9.8.tar.gz 
 wordpress/
 wordpress/xmlrpc.php
 wordpress/wp-blog-header.php
 ```
 然后修改文件拥有者为nginx。
 ```bash
-[root@ymq-srv011 opt]# chown -R nginx:nginx wordpress
+[root@srv011 opt]# chown -R nginx:nginx wordpress
 ```
 
 ## 修改wordpress配置文件
 
 ```bash
-[root@ymq-srv011 wordpress]# cp wp-config-sample.php wp-config.php
+[root@srv011 wordpress]# cp wp-config-sample.php wp-config.php
 ```
 修改配置文件wp-config.php，设置数据访问信息。
 ```php
@@ -232,7 +232,7 @@ define('DB_HOST', 'jddb-cn-north-1-fd9a1be6a9e34f0c.jcloud.com');
 ![Getting Started](./images/wordpress-install.png)
 在上图中输入必要的信息（包括站点标题、用户名、密码等）,点击[安装WordPress]，将完成安装。此时，访问MySQL数据库，将看到已经生成如下表。
 ```SQL
-[root@ymq-srv011 wordpress]# mysql -u user001 -p -h jddb-cn-north-1-fd9a1be6a9e34f0c.jcloud.com
+[root@srv011 wordpress]# mysql -u user001 -p -h jddb-cn-north-1-fd9a1be6a9e34f0c.jcloud.com
 Enter password: 
 Welcome to the MariaDB monitor.  Commands end with ; or \g.
 Your MySQL connection id is 2534976

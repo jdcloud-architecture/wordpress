@@ -252,7 +252,7 @@ log-bin=mysql-bin
 
 
 ```ini
-[root@ymq-srv011 etc]# cat my.cnf
+[root@srv011 etc]# cat my.cnf
 # For advice on how to change settings please see
 # http://dev.mysql.com/doc/refman/5.7/en/server-configuration-defaults.html
 
@@ -323,25 +323,25 @@ mysql> show master logs;
 +------------------+-----------+
 1 row in set (0.00 sec)
 
-[root@ymq-srv011 ~]# time mysqldump -u sbtest -pPassw0rd --databases sbtest --single-transaction --flush-logs>sbtest.sql
+[root@srv011 ~]# time mysqldump -u sbtest -pPassw0rd --databases sbtest --single-transaction --flush-logs>sbtest.sql
 mysqldump: [Warning] Using a password on the command line interface can be insecure.
 
 real	2m3.736s
 user	1m6.830s
 sys	0m7.362s
-[root@ymq-srv011 ~]# ls -al *.sql
+[root@srv011 ~]# ls -al *.sql
 -rw-r--r-- 1 root root 8043029640 Nov  1 13:04 sbtest.sql
 ```
 
 
 
 ```
-[root@ymq-srv011 mysql]# ls -al mysql-bin.*
+[root@srv011 mysql]# ls -al mysql-bin.*
 -rw-r----- 1 mysql mysql  928 Nov  1 12:59 mysql-bin.000001
 -rw-r----- 1 mysql mysql 1406 Nov  1 13:02 mysql-bin.000002
 -rw-r----- 1 mysql mysql 1220 Nov  1 13:03 mysql-bin.000003
 -rw-r----- 1 mysql mysql   57 Nov  1 13:02 mysql-bin.index
-[root@ymq-srv011 mysql]# pwd
+[root@srv011 mysql]# pwd
 /var/lib/mysql
 ```
 数据不离线
@@ -377,7 +377,7 @@ time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com
 
 
 导入全量数据，话费14分钟
-[root@ymq-srv011 ~]# time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -Dsbtest<sbtest.sql
+[root@srv011 ~]# time  mysql -uuser001 -pPassw0rd  -h jddb-cn-north-1-e7501da9ca874bd0.jcloud.com -Dsbtest<sbtest.sql
 mysql: [Warning] Using a password on the command line interface can be insecure.
 real	14m43.311s
 user	0m54.393s
@@ -387,5 +387,5 @@ sys	0m20.569s
 
 
               (No default value)
-[root@ymq-srv011 ~]# mysqlbinlog --skip-gtids --start-position=123 --stop-position=1120  /var/lib/mysql/mysql-bin.000003 > `date +%F-%T`-add.sql
-[root@ymq-srv011 ~]# 
+[root@srv011 ~]# mysqlbinlog --skip-gtids --start-position=123 --stop-position=1120  /var/lib/mysql/mysql-bin.000003 > `date +%F-%T`-add.sql
+[root@srv011 ~]# 
