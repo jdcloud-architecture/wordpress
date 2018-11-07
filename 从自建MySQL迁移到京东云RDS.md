@@ -256,7 +256,7 @@ root@srv011 target]# ~/s3cmd/s3cmd get s3://solution/sbtest.sql.gz
 download: 's3://solution/sbtest.sql.gz' -> './sbtest.sql.gz'  [1 of 1]
  3851542486 of 3851542486   100% in   32s   114.37 MB/s  done
 
-[root@srv011 target]# gzip -d sbtest.sql.gz
+[root@srv011 target]# <b>gzip</b> -d sbtest.sql.gz
 [root@srv011 target]# ls -al *.sql
 -rw-r--r-- 1 root root 8043029672 Nov  2 08:19 sbtest.sql
 ```
@@ -269,8 +269,10 @@ user	0m55.703s
 sys	0m23.169s
 ```
 # 3 迁移增量数据
+<font color="#dd00dd">**浅红色文字**</font>
 迁移增量数据是指导入在开始导出全量数据时间点后形成的新的binlog文件，该操作需要数据库账号具有超级权限。在正常情况下，京东云RDS账户不具有超级权限。
 ## 3.1 提交工单，申请超级用户权限
+<font color=">
 正常情况下，用户不具备超级权限，执行show master logs命令将报错。
 ```
 mysql> show master logs;

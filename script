@@ -1,0 +1,33 @@
+fio --directory=/data --name fio_randwrite --direct=1 --rw=randwrite --bs=4k --size=1G --numjobs=16 --time_based --runtime=60 --group_reporting --norandommap
+
+fio --directory=/data --name fio_randread --direct=1 --rw=randread --bs=4k --size=1G --numjobs=16 --time_based --runtime=60 --group_reporting --norandommap
+
+fio --directory=/data --name fio_seqread --direct=1 --rw=read --bs=4k --size=1G --numjobs=16 --time_based --runtime=60 --group_reporting --norandommap
+
+fio --directory=/data --name fio_seqwrite --direct=1 --rw=write --bs=4k --size=1G --numjobs=16 --time_based --runtime=60 --group_reporting --norandommap
+
+
+ 
+
+
+fio --directory=/root --name fio_seqwrite --direct=1   -iodepth=128 --rw=write --bs=4k --size=1G --numjobs=16 --time_based --runtime=60 --group_reporting --norandommap
+
+
+sudo fio --directory=/root --name fio_randwrite --direct=1 --rw=randwrite --bs=4k --size=1G --numjobs=16 --time_based --runtime=180 --group_reporting --norandommap
+
+
+
+fio --bs=4k --ioengine=libaio --iodepth=64 --direct=1 --rw=read --time_based --runtime=600  --refill_buffers --norandommap --randrepeat=0 --group_reporting --name=fio-read  --filename=/dev/vda1和命令
+fio --directory=/root --name fio_seqread --direct=1 --rw=read --bs=4k --size=1G --numjobs=16 --iodepth=64 --time_based --runtime=60 --group_reporting --norandommap
+
+fio --directory=/root --name fio_seqread --direct=1 --rw=randread --bs=4k --size=1G --numjobs=16 --iodepth=64  --time_based --runtime=60 --group_reporting --norandommap 
+
+
+fio --directory=/data --name fio_seqread --direct=1 --rw=randread --bs=4k --size=1G --numjobs=16 --iodepth=64  --time_based --runtime=60 --group_reporting --norandommap 
+
+ fio -direct=1 -iodepth=128  -ioengine=libaio -bs=4k -size=1G -numjobs=16 -runtime=180 -group_reporting  -rw=randread --directory=/root -name=fio_test
+
+
+ sysbench fileio --file-total-size=10G --file-test-mode=rndrw --file-block-size=4096  run --time=60 --file-io-mode=async --threads=4
+
+ 
